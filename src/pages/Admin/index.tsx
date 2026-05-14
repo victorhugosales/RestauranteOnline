@@ -37,9 +37,8 @@ interface Produto {
     createdAt?: string;
 }
 
-// Tipagem para os valores iniciais do formulário do Mantine
 interface FormValores {
-    id: number;
+    id?: number; // Opcional pois o novo produto não tem ID ainda
     nome: string;
     descricao: string;
     preco: number;
@@ -51,21 +50,25 @@ export function Admin() {
     const [produtos, setProdutos] = useState<Produto[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const [opened, { open, close }] = useDisclosure(false);
-    const [loadingEdit, setLoadingEdit] = useState(false);
-    const [produtoEmEdicaoId, setProdutoEmEdicaoId] = useState<number | null>(null)
+    // Modais
+    const [openedForm, { open: openForm, close: closeForm }] = useDisclosure(false);
+    const [openedDelete, { open: openDelete, close: closeDelete }] = useDisclosure(false);
     
-    // Adicionado tipagem genérica <FormValores> para evitar implicit 'any'
+    const [loadingSubmit, setLoadingSubmit] = useState(false);
+    const [loadingDelete, setLoadingDelete] = useState(false);
+    
+    // Se for null, o modal entende que é "Novo Produto". Se tiver ID, é "Edição".
+    const [produtoEmEdicaoId, setProdutoEmEdicaoId] = useState<number | null>(null);
+    const [produtoParaRemover, setProdutoParaRemover] = useState<Produto | null>(null);
+
     const form = useForm<FormValores>({
         initialValues: {
-            id: 0,
             nome: '',
             descricao: '',
             preco: 0,
             categoria: '',
             disponivel: true,
         },
-
         validate: {
             nome: (value: string) => (value.length < 3 ? 'Nome deve ter pelo menos 3 caracteres' : (value.length > 100 ? 'Nome máx. 100 caracteres' : null)),
             descricao: (value: string) => (value && value.length > 500 ? 'Descrição máx. 500 caracteres' : null),
@@ -80,11 +83,7 @@ export function Admin() {
             const dados = await produtoService.listar();
             setProdutos(dados);
         } catch (error) {
-            notifications.show({
-                title: 'Erro',
-                message: 'Falha ao buscar produtos da API',
-                color: 'red'
-            });
+            notifications.show({ title: 'Erro', message: 'Falha ao buscar produtos da API', color: 'red' });
         } finally {
             setLoading(false);
         }
@@ -94,51 +93,82 @@ export function Admin() {
         carregarDados();
     }, []);
 
+    // Função para abrir o modal de CADASTRO
+    const handleNewProduct = () => {
+        setProdutoEmEdicaoId(null);
+        form.reset();
+        openForm();
+    };
+
+    // Função para abrir o modal de EDIÇÃO
     const handleEdit = (produtoId: number) => {
-        // 1. Limpa erros de validações anteriores
         form.clearErrors();
         setProdutoEmEdicaoId(produtoId);
         
-        // 2. Abre o modal imediatamente na tela
-        open(); 
-
-        // 3. Busca o produto direto da lista que já veio do banco no useEffect
         const produtoLocal = produtos.find(p => p.id === produtoId);
-        
         if (produtoLocal) {
             form.setValues({
-                id: produtoLocal.id,
                 nome: produtoLocal.nome,
                 descricao: produtoLocal.descricao || '', 
                 preco: produtoLocal.preco,
                 categoria: produtoLocal.categoria,
                 disponivel: produtoLocal.disponivel,
             });
-            form.resetDirty(); // Avisa o Mantine Form que o estado inicial foi carregado
+            form.resetDirty();
+            openForm();
         }
     };
 
-    const handleSave = async (values: FormValores) => {
-        if (!produtoEmEdicaoId) return;
-
+    // Função unificada para SALVAR (Create ou Update)
+    const handleSubmit = async (values: FormValores) => {
         try {
-            setLoadingEdit(true);
-
-            const dadosParaEnviar = {
-                ...values,
-                descricao: values.descricao || null,
+            setLoadingSubmit(true);
+            const dadosParaEnviar = { 
+                ...values, 
+                descricao: values.descricao || null 
             };
 
-            await produtoService.atualizar(produtoEmEdicaoId, dadosParaEnviar);
+            if (produtoEmEdicaoId) {
+                // Modo Edição: PUT /api/produtos/:id
+                await produtoService.atualizar(produtoEmEdicaoId, dadosParaEnviar);
+                notifications.show({ title: 'Sucesso', message: 'Produto atualizado!', color: 'green' });
+            } else {
+                // Modo Cadastro: POST /api/produtos
+                await produtoService.cadastrar(dadosParaEnviar);
+                notifications.show({ title: 'Sucesso', message: 'Produto cadastrado!', color: 'green' });
+            }
 
-            notifications.show({ title: 'Sucesso', message: 'Produto atualizado com sucesso!', color: 'green' });
-            close();
+            closeForm();
             carregarDados();
-
         } catch (error: any) {
-            notifications.show({ title: 'Erro', message: error.response?.data?.error || 'Falha ao salvar edições do produto', color: 'red' });
+            // Exibe erro da API (400) ou erro genérico
+            notifications.show({ 
+                title: 'Erro', 
+                message: error.response?.data?.error || 'Falha ao processar requisição', 
+                color: 'red' 
+            });
         } finally {
-            setLoadingEdit(false);
+            setLoadingSubmit(false);
+        }
+    };
+
+    const handleConfirmDelete = (produto: Produto) => {
+        setProdutoParaRemover(produto);
+        openDelete();
+    };
+
+    const handleDelete = async () => {
+        if (!produtoParaRemover) return;
+        try {
+            setLoadingDelete(true);
+            await produtoService.remover(produtoParaRemover.id);
+            notifications.show({ title: 'Sucesso', message: 'Produto removido!', color: 'green' });
+            closeDelete();
+            carregarDados();
+        } catch (error: any) {
+            notifications.show({ title: 'Erro', message: 'Falha ao remover produto', color: 'red' });
+        } finally {
+            setLoadingDelete(false);
         }
     };
 
@@ -164,20 +194,10 @@ export function Admin() {
             </Table.Td>
             <Table.Td>
                 <Group gap="xs">
-                    <ActionIcon
-                        variant="light"
-                        color="blue"
-                        title="Editar"
-                        onClick={(e) => {
-                            e.stopPropagation(); // Evita que o clique afete a linha da tabela
-                            handleEdit(produto.id);
-                        }}>
+                    <ActionIcon variant="light" color="blue" onClick={() => handleEdit(produto.id)}>
                         <IconPencil size="1.2rem" />
                     </ActionIcon>
-                    <ActionIcon
-                        variant="light"
-                        color="red"
-                        title="Excluir">
+                    <ActionIcon variant="light" color="red" onClick={() => handleConfirmDelete(produto)}>
                         <IconTrash size="1.2rem" />
                     </ActionIcon>
                 </Group>
@@ -187,51 +207,102 @@ export function Admin() {
 
     return (
         <Container size="xl">
-            <Modal opened={opened} onClose={close} title="Editar produto" centered size="md" padding="xl">
-                {loadingEdit ? (
-                    <Center my="xl">
-                        <Loader color="orange" type="dots" size="lg" />
-                    </Center>
-                ) : (
-                    <form onSubmit={form.onSubmit(handleSave)}>
-                        <Stack gap="md">
-                            <TextInput label="Nome" placeholder="Hambúrguer Artesanal" required {...form.getInputProps('nome')} />
-                            <Textarea label="Descrição" placeholder="Pão brioche..." rows={4} required {...form.getInputProps('descricao')} />
+            {/* Modal Único para Cadastro/Edição */}
+            <Modal 
+                opened={openedForm} 
+                onClose={closeForm} 
+                title={produtoEmEdicaoId ? "Editar produto" : "Novo produto"} 
+                centered 
+                size="md" 
+                padding="xl"
+            >
+                <form onSubmit={form.onSubmit(handleSubmit)}>
+                    <Stack gap="md">
+                        <TextInput 
+                            label="Nome" 
+                            placeholder="Ex: Hambúrguer Artesanal" 
+                            required 
+                            {...form.getInputProps('nome')} 
+                        />
+                        <Textarea 
+                            label="Descrição" 
+                            placeholder="Ingredientes, modo de preparo, etc." 
+                            rows={4} 
+                            required 
+                            {...form.getInputProps('descricao')} 
+                        />
+                        <Group grow>
+                            <NumberInput 
+                                label="Preço" 
+                                placeholder="0,00" 
+                                decimalScale={2} 
+                                fixedDecimalScale 
+                                prefix="R$ " 
+                                required 
+                                {...form.getInputProps('preco')} 
+                            />
+                            <Select 
+                                label="Categoria" 
+                                placeholder="Selecione" 
+                                required 
+                                data={['Bebidas', 'Lanches', 'Pratos']} 
+                                {...form.getInputProps('categoria')} 
+                            />
+                        </Group>
+                        <Switch 
+                            label="Disponível no cardápio" 
+                            color="orange" 
+                            checked={form.values.disponivel} 
+                            {...form.getInputProps('disponivel', { type: 'checkbox' })} 
+                        />
+                        <Group justify="flex-end" mt="xl">
+                            <Button variant="subtle" color="gray" onClick={closeForm}>Cancelar</Button>
+                            <Button 
+                                type="submit" 
+                                color="orange" 
+                                loading={loadingSubmit}
+                            >
+                                {produtoEmEdicaoId ? "Salvar alterações" : "Cadastrar"}
+                            </Button>
+                        </Group>
+                    </Stack>
+                </form>
+            </Modal>
 
-                            <Group grow gap="md">
-                                <NumberInput label="Preço" placeholder="R$ 32,90" min={0} decimalScale={2} fixedDecimalScale prefix="R$ " required {...form.getInputProps('preco')} />
-                                <Select label="Categoria" placeholder="Lanches" required data={['Bebidas', 'Lanches', 'Pratos']} {...form.getInputProps('categoria')} />
-                            </Group>
-
-                            <Switch label="Disponível no cardápio" color="orange" checked={form.values.disponivel} {...form.getInputProps('disponivel', { type: 'checkbox' })} />
-
-                            <Group justify="flex-end" mt="xl" gap="sm">
-                                <Button variant="subtle" color="gray" onClick={close} size="sm">Cancelar</Button>
-                                <Button type="submit" color="orange" radius="md" size="sm" loading={loadingEdit}>Salvar alterações</Button>
-                            </Group>
-                        </Stack>
-                    </form>
-                )}
+            {/* Modal de Exclusão */}
+            <Modal opened={openedDelete} onClose={closeDelete} title="Remover produto" centered size="sm">
+                <Stack gap="md">
+                    <Text size="sm">
+                        Tem certeza que deseja remover <Text span fw={700}>{produtoParaRemover?.nome}</Text>? Esta ação não pode ser desfeita.
+                    </Text>
+                    <Group justify="flex-end" gap="sm">
+                        <Button variant="outline" color="gray" onClick={closeDelete} size="xs">Cancelar</Button>
+                        <Button color="red" onClick={handleDelete} loading={loadingDelete} size="xs">Remover</Button>
+                    </Group>
+                </Stack>
             </Modal>
 
             <Group justify="space-between" mb="xl">
                 <div>
                     <Title order={2}>Gestão de Cardápio</Title>
                     <Text c="dimmed" size="sm">
-                        {loading ? 'Carregando quantidade...' : `${produtos.length} produtos cadastrados`}
+                        {loading ? 'Carregando...' : `${produtos.length} produtos cadastrados`}
                     </Text>
                 </div>
-                <Button leftSection={<IconPlus size="1.2rem" />} color="orange" radius="md">
+                <Button 
+                    leftSection={<IconPlus size="1.2rem" />} 
+                    color="orange" 
+                    radius="md"
+                    onClick={handleNewProduct} // Gatilho para Novo Produto
+                >
                     Novo produto
                 </Button>
             </Group>
 
             {loading ? (
-                <Center my="xl">
-                    <Loader color="orange" type="dots" size="lg" />
-                </Center>
+                <Center my="xl"><Loader color="orange" type="dots" /></Center>
             ) : (
-                <Table highlightOnHover withTableBorder withColumnBorders>
+                <Table highlightOnHover withTableBorder>
                     <Table.Thead>
                         <Table.Tr>
                             <Table.Th>ID</Table.Th>
@@ -243,15 +314,7 @@ export function Admin() {
                             <Table.Th>Ações</Table.Th>
                         </Table.Tr>
                     </Table.Thead>
-                    <Table.Tbody>
-                        {rows.length > 0 ? rows : (
-                            <Table.Tr>
-                                <Table.Td colSpan={7} style={{ textAlign: 'center' }}>
-                                    <Text c="dimmed" py="xl">Nenhum produto cadastrado.</Text>
-                                </Table.Td>
-                            </Table.Tr>
-                        )}
-                    </Table.Tbody>
+                    <Table.Tbody>{rows}</Table.Tbody>
                 </Table>
             )}
         </Container>
