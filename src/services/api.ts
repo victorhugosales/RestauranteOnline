@@ -2,13 +2,18 @@ import axios from 'axios';
 
 // A URL deve apontar para o seu servidor Node.js
 const api = axios.create({
-  baseURL: 'http://localhost:3000/api', 
+  baseURL: 'http://localhost:6543/api', 
 });
 
 export const produtoService = {
   // Conforme requisito: GET /api/produtos [cite: 18]
   listar: async () => {
     const response = await api.get('/produtos');
+    return response.data;
+  },
+
+  obterPorId: async (id: number) => {
+    const response = await api.get(`/produtos/${id}`);
     return response.data;
   },
 
@@ -21,5 +26,10 @@ export const produtoService = {
   // Conforme requisito: DELETE /api/produtos/:id [cite: 21]
   remover: async (id: number) => {
     await api.delete(`/produtos/${id}`);
-  }
+  },
+
+  atualizar: async (id: number, dados: any) => {
+    const response = await api.put(`/produtos/${id}`, dados);
+    return response.data;
+  },
 };
