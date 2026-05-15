@@ -18,7 +18,9 @@ import {
     UnstyledButton, 
     Avatar,
     SimpleGrid,
-    Box
+    Box,
+    Loader,
+    Center
 } from '@mantine/core';
 import { IconPencil, IconTrash, IconPlus, IconPhoto } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
@@ -37,7 +39,7 @@ interface Produto {
     categoria: 'Bebidas' | 'Lanches' | 'Pratos';
     disponivel: boolean;
     createdAt?: string;
-    imagem_Url: string | null;
+    imagemUrl: string | null; // CORREÇÃO: imagemUrl em camelCase
 }
 
 interface FormValores {
@@ -52,14 +54,14 @@ interface FormValores {
 
 export function Admin() {
     const [produtos, setProdutos] = useState<Produto[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true); // Agora sendo usado no JSX abaixo
     const [categoriaFiltro, setCategoriaFiltro] = useState<string>('Todas');
 
     const [openedForm, { open: openForm, close: closeForm }] = useDisclosure(false);
-    const [openedDelete, { open: openDelete, close: closeDelete }] = useDisclosure(false);
+    const [openedDelete, { open: openDelete, close: closeDelete }] = useDisclosure(false); // Agora sendo usado
     
     const [loadingSubmit, setLoadingSubmit] = useState(false);
-    const [loadingDelete, setLoadingDelete] = useState(false);
+    const [loadingDelete, setLoadingDelete] = useState(false); // Agora sendo usado
     
     const [produtoEmEdicaoId, setProdutoEmEdicaoId] = useState<number | null>(null);
     const [produtoParaRemover, setProdutoParaRemover] = useState<Produto | null>(null);
@@ -159,7 +161,7 @@ export function Admin() {
     const rows = produtos.map((produto) => (
         <Table.Tr key={produto.id}>
             <Table.Td>
-                <Avatar src={produto.imagemUrl} radius="md" size="sm">
+                <Avatar src={produto.imagemUrl || ''} radius="md" size="sm">
                     <IconPhoto size="1rem" />
                 </Avatar>
             </Table.Td>
@@ -184,6 +186,7 @@ export function Admin() {
 
     return (
         <Container size="xl" py="xl">
+            {/* Modal de Formulário */}
             <Modal opened={openedForm} onClose={closeForm} title={produtoEmEdicaoId ? "Editar produto" : "Novo produto"} size="lg" centered>
                 <form onSubmit={form.onSubmit(handleSubmit)}>
                     <Stack gap="md">
@@ -221,7 +224,7 @@ export function Admin() {
                             </SimpleGrid>
                         </Box>
 
-                        <Switch label="Disponível no cardápio" color="orange" {...form.getInputProps('disponivel', { type: 'checkbox' })} />
+                        <Switch label="Disponível no cardápio" color="orange" checked={form.values.disponivel} {...form.getInputProps('disponivel', { type: 'checkbox' })} />
                         <Group justify="flex-end" mt="md">
                             <Button variant="subtle" onClick={closeForm}>Cancelar</Button>
                             <Button type="submit" color="orange" loading={loadingSubmit}>{produtoEmEdicaoId ? "Salvar alterações" : "Cadastrar"}</Button>
@@ -230,25 +233,40 @@ export function Admin() {
                 </form>
             </Modal>
 
-            {/* Modal de Deletar e Cabeçalho da Tabela permanecem os mesmos... */}
+            {/* Modal de Confirmação de Deleção (Resolve o erro do handleDelete) */}
+            <Modal opened={openedDelete} onClose={closeDelete} title="Confirmar exclusão" centered>
+                <Text size="sm">Tem certeza que deseja excluir <b>{produtoParaRemover?.nome}</b>?</Text>
+                <Group justify="flex-end" mt="md">
+                    <Button variant="subtle" onClick={closeDelete}>Não, manter</Button>
+                    <Button color="red" onClick={handleDelete} loading={loadingDelete}>Sim, excluir</Button>
+                </Group>
+            </Modal>
+
             <Group justify="space-between" mb="xl">
-                <Title order={2}>Gestão de Cardápio</Title>
+                <div>
+                    <Title order={2}>Gestão de Cardápio</Title>
+                    <Text size="sm" c="dimmed">{produtos.length} itens cadastrados</Text>
+                </div>
                 <Button leftSection={<IconPlus size="1.2rem" />} color="orange" onClick={handleNewProduct}>Novo produto</Button>
             </Group>
 
-            <Table highlightOnHover withTableBorder>
-                <Table.Thead>
-                    <Table.Tr>
-                        <Table.Th>Foto</Table.Th>
-                        <Table.Th>Nome</Table.Th>
-                        <Table.Th>Categoria</Table.Th>
-                        <Table.Th>Preço</Table.Th>
-                        <Table.Th>Status</Table.Th>
-                        <Table.Th>Ações</Table.Th>
-                    </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>{rows}</Table.Tbody>
-            </Table>
+            {loading ? (
+                <Center py="xl"><Loader color="orange" /></Center>
+            ) : (
+                <Table highlightOnHover withTableBorder>
+                    <Table.Thead>
+                        <Table.Tr>
+                            <Table.Th>Foto</Table.Th>
+                            <Table.Th>Nome</Table.Th>
+                            <Table.Th>Categoria</Table.Th>
+                            <Table.Th>Preço</Table.Th>
+                            <Table.Th>Status</Table.Th>
+                            <Table.Th>Ações</Table.Th>
+                        </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>{rows}</Table.Tbody>
+                </Table>
+            )}
         </Container>
     );
 }
