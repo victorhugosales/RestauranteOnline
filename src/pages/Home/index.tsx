@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
-import { 
-  Text, 
-  Title, 
-  Container, 
-  SimpleGrid, 
-  Card, 
-  Badge, 
-  Group, 
+import {
+  Text,
+  Title,
+  Container,
+  SimpleGrid,
+  Card,
+  Badge,
+  Group,
   Stack,
   rem,
   Loader,
-  Center
+  Center,
+  Image,
+  Box
 } from '@mantine/core';
 
 // Importando o serviço que já possui o método listar() configurado
@@ -23,12 +25,13 @@ interface Produto {
   preco: number;
   categoria: 'Bebidas' | 'Lanches' | 'Pratos';
   disponivel: boolean;
+  imagemUrl: string;
 }
 
 export function Home() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   const categorias = ['Bebidas', 'Lanches', 'Pratos'] as const;
 
   // Função para buscar os dados da API conforme o requisito GET /api/produtos
@@ -84,24 +87,37 @@ export function Home() {
 
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
               {produtosDaCategoria.map((produto) => (
-                <Card key={produto.id} shadow="sm" p="lg" radius="md" withBorder>
-                  <Group justify="space-between" mb="xs">
-                    <Text fw={600} size="lg">{produto.nome}</Text>
-                    <Badge 
-                      color={produto.disponivel ? "green" : "gray"} 
-                      variant="light" // Variant light para combinar com o print da home
-                    >
-                      {produto.disponivel ? "DISPONÍVEL" : "INDISPONÍVEL"}
-                    </Badge>
-                  </Group>
+                <Card key={produto.id} shadow="sm" radius="md" withBorder padding="0" style={{ overflow: 'hidden' }}>
+                  {/* Imagem vinda da API/Banco de Dados */}
+                  <Card.Section>
+                    <Image
+                      src={produto.imagemUrl || 'https://placehold.co/600x400?text=Sem+Imagem'}
+                      height={200}
+                      alt={produto.nome}
+                      fallbackSrc="https://placehold.co/600x400?text=Sem+Imagem"
+                    />
+                  </Card.Section>
 
-                  <Text size="sm" c="dimmed" mb="xl" style={{ minHeight: rem(40) }}>
-                    {produto.descricao || 'Sem descrição disponível.'}
-                  </Text>
+                  {/* Conteúdo do Card com preenchimento interno */}
+                  <Box p="lg">
+                    <Group justify="space-between" mb="xs">
+                      <Text fw={600} size="lg">{produto.nome}</Text>
+                      <Badge
+                        color={produto.disponivel ? "green" : "gray"}
+                        variant="light"
+                      >
+                        {produto.disponivel ? "DISPONÍVEL" : "INDISPONÍVEL"}
+                      </Badge>
+                    </Group>
 
-                  <Text fw={700} size="xl" c="orange">
-                    R$ {produto.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </Text>
+                    <Text size="sm" c="dimmed" mb="xl" style={{ minHeight: rem(40) }}>
+                      {produto.descricao || 'Sem descrição disponível.'}
+                    </Text>
+
+                    <Text fw={700} size="xl" c="orange">
+                      R$ {produto.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </Text>
+                  </Box>
                 </Card>
               ))}
             </SimpleGrid>

@@ -2,7 +2,9 @@ import axios from 'axios';
 
 // A URL deve apontar para o seu servidor Node.js
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ||  'http://localhost:6543/api', 
+  baseURL: import.meta.env.VITE_API_URL,
+  //baseURL: 'https://backend-restauranteiaaplicada.onrender.com/api',
+  //baseURL: 'http://localhost:6543/api',
 });
 
 export const produtoService = {
