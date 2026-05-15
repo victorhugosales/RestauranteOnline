@@ -16,15 +16,19 @@ import {
     Switch,
     Stack,
     Loader,
-    Center
+    Center,
+    Image, 
+    UnstyledButton, 
+    Avatar
 } from '@mantine/core';
-import { IconPencil, IconTrash, IconPlus } from '@tabler/icons-react';
+import { IconPencil, IconTrash, IconPlus, IconPhoto } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
 
 import { useState, useEffect } from 'react';
 import { produtoService } from '../../services/api';
 import { notifications } from '@mantine/notifications';
 import { useDisclosure } from '@mantine/hooks';
+import { PRESET_IMAGES } from '../../constants/imagensPadrao';
 
 interface Produto {
     id: number;
@@ -34,6 +38,7 @@ interface Produto {
     categoria: 'Bebidas' | 'Lanches' | 'Pratos';
     disponivel: boolean;
     createdAt?: string;
+    imagemUrl: string | null;
 }
 
 interface FormValores {
@@ -43,6 +48,7 @@ interface FormValores {
     preco: number;
     categoria: string;
     disponivel: boolean;
+    imagemUrl: string;
 }
 
 export function Admin() {
@@ -67,6 +73,7 @@ export function Admin() {
             preco: 0,
             categoria: '',
             disponivel: true,
+            imagemUrl: '',
         },
         validate: {
             nome: (value: string) => (value.length < 3 ? 'Nome deve ter pelo menos 3 caracteres' : (value.length > 100 ? 'Nome máx. 100 caracteres' : null)),
@@ -112,6 +119,7 @@ export function Admin() {
                 preco: produtoLocal.preco,
                 categoria: produtoLocal.categoria,
                 disponivel: produtoLocal.disponivel,
+                imagemUrl: produtoLocal.imagemUrl || '',
             });
             form.resetDirty();
             openForm();
@@ -173,6 +181,12 @@ export function Admin() {
 
     const rows = produtos.map((produto: Produto) => (
         <Table.Tr key={produto.id}>
+            <Table.Td>
+                {/* Miniatura na Tabela */}
+                <Avatar src={produto.imagemUrl} radius="md" size="sm">
+                    <IconPhoto size="1rem" />
+                </Avatar>
+            </Table.Td>
             <Table.Td>{produto.id}</Table.Td>
             <Table.Td fw={500}>{produto.nome}</Table.Td>
             <Table.Td style={{ maxWidth: rem(300) }}>
