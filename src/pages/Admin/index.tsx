@@ -129,7 +129,7 @@ export function Admin() {
             setLoadingSubmit(true);
             if (produtoEmEdicaoId) {
                 await produtoService.atualizar(produtoEmEdicaoId, values);
-                notifications.show({ title: 'Sucesso', message: 'Produto atualizado!', color: 'green' });
+                notifications.show({ title: 'Sucesso', message: 'Produto updated!', color: 'green' });
             } else {
                 await produtoService.cadastrar(values);
                 notifications.show({ title: 'Sucesso', message: 'Produto cadastrado!', color: 'green' });
@@ -261,7 +261,8 @@ export function Admin() {
                         <TextInput label="URL da Imagem" placeholder="https://..." {...form.getInputProps('imagemUrl')} />
 
                         <Box>
-                            <Group justify="space-between" mb="xs" direction={isMobile ? 'column' : 'row'}>
+                            {/* CORREÇÃO: Removido 'direction' do Group para não quebrar o compilador da Vercel */}
+                            <Group justify="space-between" mb="xs" wrap={isMobile ? "wrap" : "nowrap"}>
                                 <Text size="sm" fw={500}>Imagens prontas</Text>
                                 <Group gap={5}>
                                     {['Todas', 'Bebidas', 'Lanches', 'Pratos'].map(cat => (
