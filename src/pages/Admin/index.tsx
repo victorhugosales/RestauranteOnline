@@ -20,7 +20,8 @@ import {
     SimpleGrid,
     Box,
     Loader,
-    Center
+    Center,
+    Paper
 } from '@mantine/core';
 import { IconPencil, IconTrash, IconPlus, IconPhoto } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
@@ -28,7 +29,7 @@ import { useForm } from '@mantine/form';
 import { useState, useEffect } from 'react';
 import { produtoService } from '../../services/api';
 import { notifications } from '@mantine/notifications';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { PRESET_IMAGES } from '../../constants/imagensPadrao';
 
 interface Produto {
@@ -39,7 +40,7 @@ interface Produto {
     categoria: 'Bebidas' | 'Lanches' | 'Pratos';
     disponivel: boolean;
     createdAt?: string;
-    imagemUrl: string | null; // CORREÇÃO: imagemUrl em camelCase
+    imagemUrl: string | null;
 }
 
 interface FormValores {
@@ -54,17 +55,20 @@ interface FormValores {
 
 export function Admin() {
     const [produtos, setProdutos] = useState<Produto[]>([]);
-    const [loading, setLoading] = useState(true); // Agora sendo usado no JSX abaixo
+    const [loading, setLoading] = useState(true);
     const [categoriaFiltro, setCategoriaFiltro] = useState<string>('Todas');
 
     const [openedForm, { open: openForm, close: closeForm }] = useDisclosure(false);
-    const [openedDelete, { open: openDelete, close: closeDelete }] = useDisclosure(false); // Agora sendo usado
+    const [openedDelete, { open: openDelete, close: closeDelete }] = useDisclosure(false);
     
     const [loadingSubmit, setLoadingSubmit] = useState(false);
-    const [loadingDelete, setLoadingDelete] = useState(false); // Agora sendo usado
+    const [loadingDelete, setLoadingDelete] = useState(false);
     
     const [produtoEmEdicaoId, setProdutoEmEdicaoId] = useState<number | null>(null);
     const [produtoParaRemover, setProdutoParaRemover] = useState<Produto | null>(null);
+
+    // Detecta se a tela é mobile (abaixo de 768px / breakpoint 'sm' do Mantine)
+    const isMobile = useMediaQuery('(max-width: 48em)');
 
     const form = useForm<FormValores>({
         initialValues: {
@@ -158,7 +162,8 @@ export function Admin() {
         ? PRESET_IMAGES 
         : PRESET_IMAGES.filter(img => img.categoria === categoriaFiltro);
 
-    const rows = produtos.map((produto) => (
+    // LAYOUT DESKTOP: Linhas tradicionais da Tabela
+    const tableRows = produtos.map((produto) => (
         <Table.Tr key={produto.id}>
             <Table.Td>
                 <Avatar src={produto.imagemUrl || ''} radius="md" size="sm">
@@ -184,15 +189,71 @@ export function Admin() {
         </Table.Tr>
     ));
 
+    // LAYOUT MOBILE: Cards empilhados idênticos ao print do Lovable
+    const mobileCards = produtos.map((produto) => (
+        <Paper key={produto.id} withBorder p="md" radius="lg" shadow="xs">
+            <Group align="flex-start" wrap="nowrap" gap="md">
+                <Image 
+                    src={produto.imagemUrl || ''} 
+                    fallbackSrc="https://placehold.co/600x400?text=Sem+Foto"
+                    w={80} 
+                    h={80} 
+                    radius="md" 
+                    style={{ objectFit: 'cover' }}
+                />
+                
+                <Stack gap={4} style={{ flex: 1 }}>
+                    <Group justify="space-between" align="flex-start" wrap="nowrap">
+                        <Text fw={700} size="md" lineClamp={2}>{produto.nome}</Text>
+                        <Text fw={700} size="md" c="orange.6" style={{ whiteSpace: 'nowrap' }}>
+                            R$ {produto.preco.toFixed(2)}
+                        </Text>
+                    </Group>
+                    
+                    {produto.descricao && (
+                        <Text size="xs" c="dimmed" lineClamp={2} mb={4}>
+                            {produto.descricao}
+                        </Text>
+                    )}
+
+                    <Group gap="xs">
+                        <Badge variant="light" color="orange" size="xs">
+                            {produto.categoria.toUpperCase()}
+                        </Badge>
+                        <Badge color={produto.disponivel ? 'green' : 'gray'} variant="filled" size="xs">
+                            {produto.disponivel ? 'DISPONÍVEL' : 'INDISPONÍVEL'}
+                        </Badge>
+                    </Group>
+                </Stack>
+            </Group>
+
+            <Group justify="flex-end" gap="sm" mt="md" pt="xs" style={{ borderTop: '1px solid #f1f3f5' }}>
+                <ActionIcon variant="light" color="blue" size="md" radius="md" onClick={() => handleEdit(produto.id)}>
+                    <IconPencil size="1.1rem" />
+                </ActionIcon>
+                <ActionIcon variant="light" color="red" size="md" radius="md" onClick={() => { setProdutoParaRemover(produto); openDelete(); }}>
+                    <IconTrash size="1.1rem" />
+                </ActionIcon>
+            </Group>
+        </Paper>
+    ));
+
     return (
         <Container size="xl" py="xl">
-            {/* Modal de Formulário */}
-            <Modal opened={openedForm} onClose={closeForm} title={produtoEmEdicaoId ? "Editar produto" : "Novo produto"} size="lg" centered>
+            {/* Modal de Formulário - Responsivo (Tela cheia no mobile) */}
+            <Modal 
+                opened={openedForm} 
+                onClose={closeForm} 
+                title={produtoEmEdicaoId ? "Editar produto" : "Novo produto"} 
+                size="lg" 
+                centered
+                fullScreen={isMobile}
+            >
                 <form onSubmit={form.onSubmit(handleSubmit)}>
                     <Stack gap="md">
                         <TextInput label="Nome" required {...form.getInputProps('nome')} />
                         <Textarea label="Descrição" rows={3} {...form.getInputProps('descricao')} />
-                        <Group grow>
+                        <Group grow={!isMobile}>
                             <NumberInput label="Preço" decimalScale={2} prefix="R$ " required {...form.getInputProps('preco')} />
                             <Select label="Categoria" data={['Bebidas', 'Lanches', 'Pratos']} required {...form.getInputProps('categoria')} />
                         </Group>
@@ -200,7 +261,7 @@ export function Admin() {
                         <TextInput label="URL da Imagem" placeholder="https://..." {...form.getInputProps('imagemUrl')} />
 
                         <Box>
-                            <Group justify="space-between" mb="xs">
+                            <Group justify="space-between" mb="xs" direction={isMobile ? 'column' : 'row'}>
                                 <Text size="sm" fw={500}>Imagens prontas</Text>
                                 <Group gap={5}>
                                     {['Todas', 'Bebidas', 'Lanches', 'Pratos'].map(cat => (
@@ -208,7 +269,7 @@ export function Admin() {
                                     ))}
                                 </Group>
                             </Group>
-                            <SimpleGrid cols={4} spacing="xs">
+                            <SimpleGrid cols={isMobile ? 3 : 4} spacing="xs">
                                 {imagensFiltradas.map((img) => (
                                     <UnstyledButton 
                                         key={img.url} 
@@ -218,7 +279,7 @@ export function Admin() {
                                             borderRadius: '8px', overflow: 'hidden'
                                         }}
                                     >
-                                        <Image src={img.url} height={60} />
+                                        <Image src={img.url} height={60} style={{ objectFit: 'cover' }} />
                                     </UnstyledButton>
                                 ))}
                             </SimpleGrid>
@@ -233,7 +294,7 @@ export function Admin() {
                 </form>
             </Modal>
 
-            {/* Modal de Confirmação de Deleção (Resolve o erro do handleDelete) */}
+            {/* Modal de Confirmação de Deleção */}
             <Modal opened={openedDelete} onClose={closeDelete} title="Confirmar exclusão" centered>
                 <Text size="sm">Tem certeza que deseja excluir <b>{produtoParaRemover?.nome}</b>?</Text>
                 <Group justify="flex-end" mt="md">
@@ -242,16 +303,29 @@ export function Admin() {
                 </Group>
             </Modal>
 
-            <Group justify="space-between" mb="xl">
+            {/* Header Responsivo */}
+            <Group justify="space-between" align="center" mb="xl" wrap="nowrap">
                 <div>
-                    <Title order={2}>Gestão de Cardápio</Title>
-                    <Text size="sm" c="dimmed">{produtos.length} itens cadastrados</Text>
+                    <Title order={isMobile ? 3 : 2}>Gestão de Cardápio</Title>
+                    <Text size="sm" c="dimmed">{produtos.length} produtos cadastrados</Text>
                 </div>
-                <Button leftSection={<IconPlus size="1.2rem" />} color="orange" onClick={handleNewProduct}>Novo produto</Button>
+                <Button 
+                    leftSection={<IconPlus size="1.2rem" />} 
+                    color="orange" 
+                    onClick={handleNewProduct}
+                    size={isMobile ? 'sm' : 'md'}
+                >
+                    {isMobile ? 'Novo' : 'Novo produto'}
+                </Button>
             </Group>
 
+            {/* Alternância Dinâmica de Layout (Tabela vs Cards Mobile) */}
             {loading ? (
                 <Center py="xl"><Loader color="orange" /></Center>
+            ) : isMobile ? (
+                <Stack gap="md">
+                    {mobileCards}
+                </Stack>
             ) : (
                 <Table highlightOnHover withTableBorder>
                     <Table.Thead>
@@ -264,7 +338,7 @@ export function Admin() {
                             <Table.Th>Ações</Table.Th>
                         </Table.Tr>
                     </Table.Thead>
-                    <Table.Tbody>{rows}</Table.Tbody>
+                    <Table.Tbody>{tableRows}</Table.Tbody>
                 </Table>
             )}
         </Container>
